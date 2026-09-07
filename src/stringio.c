@@ -84,21 +84,6 @@ check_modifiable(mrb_state *mrb, mrb_value self)
   }
 }
 
-static void
-mrb_syserr_fail(mrb_state *mrb, mrb_int no, const char *mesg) {
-  struct RClass *sce;
-  if (mrb_class_defined(mrb, "SystemCallError")) {
-    sce = mrb_class_get_id(mrb, MRB_SYM(SystemCallError));
-    if (mesg) {
-      mrb_funcall_id(mrb, mrb_obj_value(sce), MRB_SYM(_sys_fail), 2, mrb_fixnum_value(no), mrb_str_new_cstr(mrb, mesg));
-    } else {
-      mrb_funcall_id(mrb, mrb_obj_value(sce), MRB_SYM(_sys_fail), 1, mrb_fixnum_value(no));
-    }
-  } else {
-    mrb_raise(mrb, E_RUNTIME_ERROR, mesg);
-  }
-}
-
 /* Boyer-Moore search: copied from https://github.com/ruby/ruby/ext/stringio/stringio.c */
 static void
 bm_init_skip(long *skip, const char *pat, long m)
@@ -227,7 +212,8 @@ strio_init(mrb_state *mrb, mrb_value self, mrb_int argc, mrb_value *argv)
   }
 
   if (argc == 2 && (flags & FMODE_WRITABLE) && MRB_FROZEN_P(mrb_str_ptr(string))) {
-    mrb_syserr_fail(mrb, EACCES, 0);
+    errno = EACCES;
+    mrb_sys_fail(mrb, NULL);
   }
 
   ptr = (struct StringIO*)DATA_PTR(self);
@@ -326,7 +312,8 @@ stringio_set_pos(mrb_state *mrb, mrb_value self)
 
   mrb_get_args(mrb, "i", &pos);
   if (pos < 0) {
-    mrb_syserr_fail(mrb, EINVAL, 0);
+    errno = EINVAL;
+    mrb_sys_fail(mrb, NULL);
   }
   ptr->pos = pos;
   return mrb_fixnum_value(pos);
@@ -608,10 +595,12 @@ stringio_seek(mrb_state *mrb, mrb_value self)
       offset += RSTRING_LEN(string);
       break;
     default:
-      mrb_syserr_fail(mrb, EINVAL, "invalid whence");
+      errno = EINVAL;
+      mrb_sys_fail(mrb, "invalid whence");
   }
   if (offset < 0) {
-    mrb_syserr_fail(mrb, EINVAL, 0);
+    errno = EINVAL;
+    mrb_sys_fail(mrb, NULL);
   }
   ptr->pos = offset;
   return mrb_fixnum_value(0);
