@@ -15,6 +15,10 @@ original is https://github.com/ruby/ruby/blob/trunk/ext/stringio/stringio.c
 #if MRUBY_RELEASE_NO >= 30000
 #include "mruby/presym.h"
 #else
+/* mruby before 3.0 has no presym table: intern at runtime, same names. */
+#define MRB_SYM(s)   mrb_intern_lit(mrb, #s)
+#define MRB_SYM_Q(s) mrb_intern_lit(mrb, #s "?")
+#define MRB_SYM_E(s) mrb_intern_lit(mrb, #s "=")
 #define MRB_IVSYM(s) mrb_intern_lit(mrb, "@"#s)
 #endif
 
@@ -25,7 +29,7 @@ original is https://github.com/ruby/ruby/blob/trunk/ext/stringio/stringio.c
 #define FMODE_APPEND                0x0040
 
 #define stringio_iv_get(name) mrb_iv_get(mrb, self, MRB_IVSYM(name))
-#define E_IOERROR (mrb_class_get(mrb, "IOError"))
+#define E_IOERROR (mrb_class_get_id(mrb, MRB_SYM(IOError)))
 #define StringIO(self) get_strio(mrb, self)
 
 // For compatibility before https://github.com/mruby/mruby/pull/3340
@@ -84,11 +88,11 @@ static void
 mrb_syserr_fail(mrb_state *mrb, mrb_int no, const char *mesg) {
   struct RClass *sce;
   if (mrb_class_defined(mrb, "SystemCallError")) {
-    sce = mrb_class_get(mrb, "SystemCallError");
+    sce = mrb_class_get_id(mrb, MRB_SYM(SystemCallError));
     if (mesg) {
-      mrb_funcall(mrb, mrb_obj_value(sce), "_sys_fail", 2, mrb_fixnum_value(no), mrb_str_new_cstr(mrb, mesg));
+      mrb_funcall_id(mrb, mrb_obj_value(sce), MRB_SYM(_sys_fail), 2, mrb_fixnum_value(no), mrb_str_new_cstr(mrb, mesg));
     } else {
-      mrb_funcall(mrb, mrb_obj_value(sce), "_sys_fail", 1, mrb_fixnum_value(no));
+      mrb_funcall_id(mrb, mrb_obj_value(sce), MRB_SYM(_sys_fail), 1, mrb_fixnum_value(no));
     }
   } else {
     mrb_raise(mrb, E_RUNTIME_ERROR, mesg);
@@ -229,7 +233,7 @@ strio_init(mrb_state *mrb, mrb_value self, mrb_int argc, mrb_value *argv)
   ptr = (struct StringIO*)DATA_PTR(self);
   if (ptr) {
     /* reopen */
-    mrb_funcall(mrb, mrb_iv_get(mrb, self, MRB_IVSYM(string)), "replace", 1, string);
+    mrb_funcall_id(mrb, mrb_iv_get(mrb, self, MRB_IVSYM(string)), MRB_SYM(replace), 1, string);
   } else {
     /* initialize */
     ptr = stringio_alloc(mrb);
@@ -648,39 +652,39 @@ stringio_reopen(mrb_state *mrb, mrb_value self)
 void
 mrb_mruby_stringio_gem_init(mrb_state* mrb)
 {
-  struct RClass *stringio = mrb_define_class(mrb, "StringIO", mrb->object_class);
+  struct RClass *stringio = mrb_define_class_id(mrb, MRB_SYM(StringIO), mrb->object_class);
   MRB_SET_INSTANCE_TT(stringio, MRB_TT_DATA);
-  mrb_define_method(mrb, stringio, "initialize", stringio_initialize, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "initialize_copy", stringio_initialize_copy, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "lineno", stringio_get_lineno, MRB_ARGS_NONE());
-  mrb_define_method(mrb, stringio, "lineno=", stringio_set_lineno, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, stringio, "pos", stringio_get_pos, MRB_ARGS_NONE());
-  mrb_define_method(mrb, stringio, "pos=", stringio_set_pos, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, stringio, "rewind", stringio_rewind, MRB_ARGS_NONE());
-  mrb_define_method(mrb, stringio, "closed?", stringio_closed_p, MRB_ARGS_NONE());
-  mrb_define_method(mrb, stringio, "close", stringio_close, MRB_ARGS_NONE());
-  mrb_define_method(mrb, stringio, "read", stringio_read, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "write", stringio_write, MRB_ARGS_REQ(1));
-  mrb_define_alias(mrb, stringio, "syswrite", "write");
-  mrb_define_method(mrb, stringio, "getc", stringio_getc, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "gets", stringio_gets, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "seek", stringio_seek, MRB_ARGS_ANY());
-  mrb_define_method(mrb, stringio, "size", stringio_size, MRB_ARGS_NONE());
-  mrb_define_alias(mrb, stringio, "length", "size");
-  mrb_define_method(mrb, stringio, "eof?", stringio_eof_p, MRB_ARGS_NONE());
-  mrb_define_alias(mrb, stringio, "eof", "eof?");
-  mrb_define_method(mrb, stringio, "reopen", stringio_reopen, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(initialize), stringio_initialize, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(initialize_copy), stringio_initialize_copy, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(lineno), stringio_get_lineno, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, stringio, MRB_SYM_E(lineno), stringio_set_lineno, MRB_ARGS_REQ(1));
+  mrb_define_method_id(mrb, stringio, MRB_SYM(pos), stringio_get_pos, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, stringio, MRB_SYM_E(pos), stringio_set_pos, MRB_ARGS_REQ(1));
+  mrb_define_method_id(mrb, stringio, MRB_SYM(rewind), stringio_rewind, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, stringio, MRB_SYM_Q(closed), stringio_closed_p, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(close), stringio_close, MRB_ARGS_NONE());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(read), stringio_read, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(write), stringio_write, MRB_ARGS_REQ(1));
+  mrb_define_alias_id(mrb, stringio, MRB_SYM(syswrite), MRB_SYM(write));
+  mrb_define_method_id(mrb, stringio, MRB_SYM(getc), stringio_getc, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(gets), stringio_gets, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(seek), stringio_seek, MRB_ARGS_ANY());
+  mrb_define_method_id(mrb, stringio, MRB_SYM(size), stringio_size, MRB_ARGS_NONE());
+  mrb_define_alias_id(mrb, stringio, MRB_SYM(length), MRB_SYM(size));
+  mrb_define_method_id(mrb, stringio, MRB_SYM_Q(eof), stringio_eof_p, MRB_ARGS_NONE());
+  mrb_define_alias_id(mrb, stringio, MRB_SYM(eof), MRB_SYM_Q(eof));
+  mrb_define_method_id(mrb, stringio, MRB_SYM(reopen), stringio_reopen, MRB_ARGS_ANY());
 
-  struct RClass *io = mrb_define_class(mrb, "IO", mrb->object_class);
+  struct RClass *io = mrb_define_class_id(mrb, MRB_SYM(IO), mrb->object_class);
   /* Set I/O position from the beginning */
-  mrb_define_const(mrb, io, "SEEK_SET", mrb_fixnum_value(SEEK_SET));
+  mrb_define_const_id(mrb, io, MRB_SYM(SEEK_SET), mrb_fixnum_value(SEEK_SET));
   /* Set I/O position from the current position */
-  mrb_define_const(mrb, io, "SEEK_CUR", mrb_fixnum_value(SEEK_CUR));
+  mrb_define_const_id(mrb, io, MRB_SYM(SEEK_CUR), mrb_fixnum_value(SEEK_CUR));
   /* Set I/O position from the end */
-  mrb_define_const(mrb, io, "SEEK_END", mrb_fixnum_value(SEEK_END));
+  mrb_define_const_id(mrb, io, MRB_SYM(SEEK_END), mrb_fixnum_value(SEEK_END));
 
-  struct RClass *io_error = mrb_define_class(mrb, "IOError", mrb->eStandardError_class);
-  mrb_define_class(mrb, "EOFError", io_error);
+  struct RClass *io_error = mrb_define_class_id(mrb, MRB_SYM(IOError), mrb->eStandardError_class);
+  mrb_define_class_id(mrb, MRB_SYM(EOFError), io_error);
 }
 
 void
